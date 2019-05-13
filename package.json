@@ -1,6 +1,6 @@
 {
   "name": "ssb-master",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "secret-stack plugin for authorizing master identities",
   "main": "index.js",
   "scripts": {
