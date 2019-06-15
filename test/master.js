@@ -26,17 +26,19 @@ var alice = createSsbServer({
 
 tape('connect remote master', function (t) {
   console.log(alice.config)
-  ssbClient(bobKeys, {
-    remote: alice.getAddress(),
-    manifest: alice.manifest(),
-    caps: caps,
-  }, function (err, rpc) {
-    if(err) throw err
-    rpc.publish({
-      type: 'msg', value: 'written by bob', from: bobKeys.id
-    }, function (err) {
+  alice.on('multiserver:listening', () => {
+    ssbClient(bobKeys, {
+      remote: alice.getAddress(),
+      manifest: alice.manifest(),
+      caps: caps,
+    }, function (err, rpc) {
       if(err) throw err
-      t.end()
+      rpc.publish({
+	type: 'msg', value: 'written by bob', from: bobKeys.id
+      }, function (err) {
+	if(err) throw err
+	t.end()
+      })
     })
   })
 })
