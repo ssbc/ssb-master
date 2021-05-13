@@ -1,62 +1,82 @@
-var tape = require('tape')
-//var util = require('../lib/util')
-var ssbKeys = require('ssb-keys')
-var ssbClient = require('ssb-client')
+const tape = require('tape')
+const ssbKeys = require('ssb-keys')
+const ssbClient = require('ssb-client')
 
-var aliceKeys = ssbKeys.generate()
-var bobKeys   = ssbKeys.generate()
-var carolKeys = ssbKeys.generate()
+const aliceKeys = ssbKeys.generate()
+const bobKeys = ssbKeys.generate()
+const carolKeys = ssbKeys.generate()
 
-var createSsbServer = 
-  require('secret-stack')({})
-    .use(require('ssb-db'))
+const createSsbServer = require('secret-stack')({})
+  .use(require('ssb-db'))
   .use(require('..'))
-var caps = {
-  shs: require('crypto').randomBytes(32).toString('base64')
+
+const caps = {
+  shs: require('crypto').randomBytes(32).toString('base64'),
 }
 
-var alice = createSsbServer({
-  port: 45451, timeout: 2001,
+const alice = createSsbServer({
+  port: 45451,
+  timeout: 2001,
   temp: 'master',
   host: 'localhost',
   master: bobKeys.id,
   keys: aliceKeys,
-  caps: caps
+  caps: caps,
 })
 
-tape('connect remote master', function (t) {
-  console.log(alice.config)
+tape('connect remote master', (t) => {
+  t.plan(2)
+  if (process.env.TEST_VERBOSE) console.log(alice.config)
   alice.on('multiserver:listening', () => {
-    ssbClient(bobKeys, {
+    ssbClient(
+      bobKeys,
+      {
+        remote: alice.getAddress(),
+        manifest: alice.manifest(),
+        caps: caps,
+      },
+      (err, rpc) => {
+        t.error(err)
+        rpc.publish(
+          {
+            type: 'msg',
+            value: 'written by bob',
+            from: bobKeys.id,
+          },
+          (err) => {
+            t.error(err)
+            t.end()
+          },
+        )
+      },
+    )
+  })
+})
+
+tape('non-master cannot use same methods', (t) => {
+  t.plan(1)
+  ssbClient(
+    carolKeys,
+    {
       remote: alice.getAddress(),
       manifest: alice.manifest(),
       caps: caps,
-    }, function (err, rpc) {
-      if(err) throw err
-      rpc.publish({
-	type: 'msg', value: 'written by bob', from: bobKeys.id
-      }, function (err) {
-	if(err) throw err
-	t.end()
-      })
-    })
-  })
+    },
+    (err, rpc) => {
+      if (err) throw err
+      rpc.publish(
+        {
+          type: 'msg',
+          value: 'written by ca',
+          from: bobKeys.id,
+        },
+        (err) => {
+          t.ok(err)
+          alice.close(() => {
+            t.end()
+          })
+        },
+      )
+    },
+  )
 })
-
-tape('non-master cannot use same methods', function (t) {
-  ssbClient(carolKeys, {
-    remote: alice.getAddress(),
-    manifest: alice.manifest(),
-    caps: caps
-  }, function (err, rpc) {
-    if(err) throw err
-    rpc.publish({
-      type: 'msg', value: 'written by ca', from: bobKeys.id
-    }, function (err) {
-      t.ok(err)
-      alice.close(true)
-      t.end()
-    })
-  })
-})
-
